@@ -1,0 +1,331 @@
+// ── helpContent.js ────────────────────────────────────────────────────────────
+// All Help tab content as plain data. No JSX, no imports.
+// UIX reads from this file so content can be updated without touching components.
+
+export const GETTING_STARTED = {
+  routeA: {
+    title: 'Route A — Generate from Images',
+    steps: [
+      'Upload a front view of your object (required)',
+      'Upload a side view (required)',
+      'Upload top and bottom views if available (optional — improves accuracy)',
+      'Click Generate — the ML model analyzes your views and produces a 3D mesh',
+      'Enter the longest real-world dimension when prompted to lock the print scale',
+      'Review the model in the 3D viewer. Drag to rotate, scroll to zoom',
+      'Download your STL file when satisfied',
+    ],
+    tips: [
+      'Take photos against a plain light background for best silhouette extraction',
+      'Keep the object in frame with minimal shadow',
+      'Front and side views are the most important — top/bottom are supplemental',
+      'After generating, use the training tab to rate the result and improve future generations',
+    ],
+  },
+  routeB: {
+    title: 'Route B — Generate from Point Cloud',
+    steps: [
+      'Upload your point cloud file (.xyz, .ply, or .obj) — format is auto-detected',
+      'If unit metadata is found in the file, scale is locked automatically',
+      'If no metadata found, enter the longest real-world dimension of the object',
+      'Click Reconstruct Mesh — the Ball-Pivoting Algorithm processes your cloud',
+      'Review the mesh repair report (degenerate triangles, normals, holes filled)',
+      'Toggle between point cloud view and mesh view using the buttons',
+      'Download your STL file when satisfied',
+    ],
+    tips: [
+      'Larger point clouds (1M+ points) take several minutes — progress is shown per chunk',
+      'You can cancel mid-process and use the partial mesh if needed',
+      'Denser point clouds produce better meshes — more points = finer surface detail',
+      'If holes remain after repair, view boundary edges in wireframe mode to locate them',
+    ],
+  },
+  training: {
+    title: 'Training — Improving the Model Over Time',
+    steps: [
+      'Add objects to your training queue in the Train tab',
+      'Generate a mesh for each object using Route A',
+      'Rate each result (1–5 stars) and tag what is right or wrong',
+      'Feedback entries are saved to the database immediately',
+      'Training runs automatically every 10 entries in the background',
+      'Trigger manual training at any time with the Train Now button',
+      'When you are satisfied with a session, save a new version',
+      'The model improves with each session — first-try accuracy increases over time',
+    ],
+  },
+};
+
+export const PARAM_SCHEMA = [
+  { key: 'noiseAmplitude', label: 'Surface Amplitude',  min: 0,    max: 0.6,  step: 0.01, description: 'Amount of vertex displacement from the base shape. Higher = rougher surface.' },
+  { key: 'noiseOctaves',   label: 'Detail Octaves',     min: 1,    max: 6,    step: 1,    description: 'Number of noise layers stacked. Higher = more complex micro-texture.' },
+  { key: 'noiseScale',     label: 'Noise Scale',        min: 0.1,  max: 4.0,  step: 0.05, description: 'Frequency of surface texture. Higher = finer grain.' },
+  { key: 'subdivisions',   label: 'Subdivisions',       min: 16,   max: 96,   step: 1,    description: 'Mesh resolution. Higher = more triangles, smoother curves.' },
+  { key: 'scaleX',         label: 'Scale X',            min: 0.2,  max: 3.0,  step: 0.05, description: 'Width of the object along the X axis.' },
+  { key: 'scaleY',         label: 'Scale Y',            min: 0.2,  max: 3.0,  step: 0.05, description: 'Height of the object along the Y axis.' },
+  { key: 'scaleZ',         label: 'Scale Z',            min: 0.2,  max: 3.0,  step: 0.05, description: 'Depth of the object along the Z axis.' },
+  { key: 'twist',          label: 'Twist',              min: 0,    max: 6.28, step: 0.05, description: 'Rotational spiral along the Y axis. 0 = straight, 6.28 = full rotation.' },
+  { key: 'taper',          label: 'Taper',              min: 0,    max: 2.0,  step: 0.05, description: '1.0 = no taper. <1 = narrow top. >1 = wide top.' },
+  { key: 'ridges',         label: 'Ridges',             min: 0,    max: 8,    step: 1,    description: 'Number of surface ridge bands around the object.' },
+  { key: 'baseShape',      label: 'Base Shape',         min: 0,    max: 5,    step: 1,    description: 'Fundamental geometry: 0=sphere 1=cylinder 2=box 3=torus 4=cone 5=organic' },
+];
+
+export const TAG_CATEGORIES = [
+  {
+    id: 'surface',
+    label: 'Surface Quality',
+    objectTypes: ['organic', 'decorative', 'household'],
+    tags: [
+      { id: 'surface_more_detail',    label: 'Increase surface detail',    affects: 'noiseAmplitude ↑  noiseOctaves ↑  noiseScale ↑',  description: 'Adds more fine-grained texture and micro-variation. The mesh will show more bumps, pits, and irregularities at a small scale.' },
+      { id: 'surface_less_detail',    label: 'Reduce surface detail',      affects: 'noiseAmplitude ↓  noiseOctaves ↓',                 description: 'Smooths out excessive micro-texture. Useful when the surface looks too chaotic or noisy.' },
+      { id: 'surface_smoother',       label: 'Smoother surface',           affects: 'noiseAmplitude ↓  noiseScale ↓',                   description: 'Reduces all surface displacement toward a cleaner, more polished form.' },
+      { id: 'surface_more_variation', label: 'More texture variation',     affects: 'noiseScale ↓  noiseOctaves ↑',                     description: 'Makes surface texture uneven — rougher in some areas, smoother in others.' },
+      { id: 'surface_sharper_ridges', label: 'Sharper ridges',             affects: 'ridges ↑  noiseAmplitude ↓',                       description: 'Makes ridge features more defined and pronounced with cleaner edges.' },
+      { id: 'surface_softer_ridges',  label: 'Softer ridges',              affects: 'ridges ↓  noiseAmplitude ↑',                       description: 'Blends ridge features into the surface more gradually.' },
+      { id: 'surface_organic',        label: 'More organic texture',       affects: 'noiseOctaves ↑  baseShape → organic',              description: 'Pushes surface variation toward irregular, natural-looking displacement.' },
+      { id: 'surface_uniform',        label: 'More uniform texture',       affects: 'noiseOctaves ↓  noiseScale ↑',                     description: 'Makes surface displacement consistent and even across the whole object.' },
+      { id: 'surface_grain',          label: 'Add grain detail',           affects: 'noiseScale ↑  noiseOctaves ↑',                     description: 'Introduces fine directional texture suggesting material grain.' },
+      { id: 'surface_less_artifacts', label: 'Reduce noise artifacts',     affects: 'noiseAmplitude ↓  noiseOctaves ↓  subdivisions ↑', description: 'Removes unintended spiky or chaotic displacement that looks like errors.' },
+      { id: 'surface_natural_flow',   label: 'More natural surface flow',  affects: 'noiseScale ↓  baseShape → organic',               description: 'Makes surface displacement follow the contours of the object naturally.' },
+      { id: 'surface_crisper_edges',  label: 'Crisper edge definition',    affects: 'subdivisions ↑  noiseAmplitude ↓',                 description: 'Sharpens the transition between different surface regions.' },
+    ],
+  },
+  {
+    id: 'proportions',
+    label: 'Proportions',
+    objectTypes: ['all'],
+    tags: [
+      { id: 'prop_taller',       label: 'Taller',                  affects: 'scaleY ↑',                     description: 'Stretches the object along its vertical axis.' },
+      { id: 'prop_shorter',      label: 'Shorter',                 affects: 'scaleY ↓',                     description: 'Compresses the object along its vertical axis.' },
+      { id: 'prop_wider',        label: 'Wider',                   affects: 'scaleX ↑',                     description: 'Expands the object horizontally.' },
+      { id: 'prop_narrower',     label: 'Narrower',                affects: 'scaleX ↓',                     description: 'Compresses the object horizontally.' },
+      { id: 'prop_deeper',       label: 'Deeper front to back',    affects: 'scaleZ ↑',                     description: 'Expands the object along its depth axis.' },
+      { id: 'prop_shallower',    label: 'Shallower front to back', affects: 'scaleZ ↓',                     description: 'Compresses the depth axis.' },
+      { id: 'prop_compact',      label: 'More compact overall',    affects: 'scaleX ↓  scaleY ↓  scaleZ ↓', description: 'Reduces all dimensions proportionally.' },
+      { id: 'prop_elongated',    label: 'More elongated overall',  affects: 'scaleY ↑  scaleX ↓  scaleZ ↓', description: 'Stretches all dimensions with emphasis on the longest axis.' },
+      { id: 'prop_larger',       label: 'Larger scale',            affects: 'scaleX ↑  scaleY ↑  scaleZ ↑', description: 'Increases overall size uniformly.' },
+      { id: 'prop_smaller',      label: 'Smaller scale',           affects: 'scaleX ↓  scaleY ↓  scaleZ ↓', description: 'Decreases overall size uniformly.' },
+      { id: 'prop_top_heavy',    label: 'Top heavier',             affects: 'taper ↑',                      description: 'More mass and volume in the upper portion.' },
+      { id: 'prop_bottom_heavy', label: 'Bottom heavier',          affects: 'taper ↓',                      description: 'More mass and volume in the lower portion.' },
+      { id: 'prop_symmetric',    label: 'More symmetrical',        affects: 'scaleX = scaleZ  noiseAmplitude ↓', description: 'Pushes form toward balanced, even proportions.' },
+      { id: 'prop_asymmetric',   label: 'More asymmetrical',       affects: 'scaleX ≠ scaleZ  noiseAmplitude ↑', description: 'Introduces imbalance between axes.' },
+    ],
+  },
+  {
+    id: 'baseshape',
+    label: 'Base Shape',
+    objectTypes: ['all'],
+    tags: [
+      { id: 'base_rounder',     label: 'Rounder base shape',         affects: 'baseShape → sphere or cylinder', description: 'The fundamental cross-section becomes more circular.' },
+      { id: 'base_angular',     label: 'More angular base shape',    affects: 'baseShape → box',                description: 'The fundamental cross-section becomes more faceted.' },
+      { id: 'base_cylindrical', label: 'More cylindrical',           affects: 'baseShape → cylinder  taper → 1', description: 'Tube-like or column form — consistent circular cross-section.' },
+      { id: 'base_boxy',        label: 'More box-like',              affects: 'baseShape → box',                description: 'Rectangular, rectilinear form with flat faces.' },
+      { id: 'base_cone_wide_bottom', label: 'Conical — wider bottom', affects: 'baseShape → cone  taper ↓',    description: 'Tapers upward from a wide base to a narrow top.' },
+      { id: 'base_cone_wide_top',    label: 'Conical — wider top',   affects: 'taper ↑',                       description: 'Widens as it goes up — inverted cone form.' },
+      { id: 'base_spherical',   label: 'More spherical',             affects: 'baseShape → sphere  scales equalized', description: 'Overall form approaches a ball.' },
+      { id: 'base_toroidal',    label: 'More toroidal',              affects: 'baseShape → torus',              description: 'Donut or ring-like form.' },
+      { id: 'base_organic',     label: 'More organic — irregular',   affects: 'baseShape → organic  noiseAmplitude ↑', description: 'Irregular and asymmetric, like a natural object.' },
+      { id: 'base_geometric',   label: 'More geometric — precise',   affects: 'baseShape → box or cylinder  noiseAmplitude ↓', description: 'More mathematically regular and precise.' },
+      { id: 'base_flatter',     label: 'Flatter overall',            affects: 'scaleY ↓  scaleX ↑  scaleZ ↑', description: 'Loses vertical volume and becomes more disc or slab-like.' },
+      { id: 'base_volumetric',  label: 'More volumetric',            affects: 'scaleY ↑  scales balanced',     description: 'Gains fullness and three-dimensional presence.' },
+    ],
+  },
+  {
+    id: 'twist',
+    label: 'Twist and Flow',
+    objectTypes: ['organic', 'decorative', 'household'],
+    tags: [
+      { id: 'twist_add',          label: 'Add twist',                   affects: 'twist ↑',            description: 'Introduces a rotational spiral along the vertical axis.' },
+      { id: 'twist_reduce',       label: 'Reduce twist',                affects: 'twist ↓',            description: 'Straightens the object by reducing rotational spiral.' },
+      { id: 'twist_gradual',      label: 'More gradual twist',          affects: 'twist at low-moderate value', description: 'Twist happens slowly and evenly from bottom to top.' },
+      { id: 'twist_aggressive',   label: 'More aggressive twist',       affects: 'twist ↑ toward max', description: 'Rotation from bottom to top is rapid and pronounced.' },
+      { id: 'taper_smoother',     label: 'Smoother taper',              affects: 'taper → 1.0',        description: 'Transition from wide to narrow happens gradually.' },
+      { id: 'taper_pronounced',   label: 'More pronounced taper',       affects: 'taper away from 1.0', description: 'Stronger difference between widest and narrowest cross-section.' },
+      { id: 'taper_top',          label: 'Taper toward top',            affects: 'taper ↓',            description: 'Object gets narrower as it goes up.' },
+      { id: 'taper_bottom',       label: 'Taper toward bottom',         affects: 'taper ↑',            description: 'Object widens as it goes up.' },
+      { id: 'flow_natural',       label: 'More natural flow between sections', affects: 'noiseScale ↓  subdivisions ↑', description: 'Transitions feel smooth and continuous.' },
+      { id: 'axis_straighter',    label: 'Straighter vertical axis',    affects: 'twist → 0  noiseAmplitude ↓', description: 'Removes lean or wobble in the central axis.' },
+    ],
+  },
+  {
+    id: 'mechanical',
+    label: 'Mechanical / Functional',
+    objectTypes: ['mechanical'],
+    tags: [
+      { id: 'mech_sharp_edges',   label: 'Sharper functional edges',         affects: 'noiseAmplitude ↓  subdivisions ↑  baseShape → box/cylinder', description: 'Edges that serve a purpose become more precisely defined.' },
+      { id: 'mech_clean_faces',   label: 'Cleaner flat faces',               affects: 'noiseAmplitude ↓  baseShape → box',                           description: 'Flat planar surfaces become more truly flat.' },
+      { id: 'mech_holes',         label: 'Better defined holes / apertures', affects: 'subdivisions ↑  noiseAmplitude ↓',                             description: 'Openings and bores become more clearly formed.' },
+      { id: 'mech_tolerances',    label: 'Tighter tolerances on joins',      affects: 'noiseAmplitude ↓  subdivisions ↑',                             description: 'Mating surfaces become more precise.' },
+      { id: 'mech_wall_uniform',  label: 'More uniform wall thickness',      affects: 'noiseAmplitude ↓  scales equalized',                           description: 'Walls maintain consistent thickness throughout.' },
+      { id: 'mech_parting_lines', label: 'Cleaner parting lines',            affects: 'noiseAmplitude ↓ at equator  subdivisions ↑',                  description: 'Seam where two halves meet is sharper.' },
+      { id: 'mech_mounting',      label: 'Better defined mounting points',   affects: 'subdivisions ↑  noiseAmplitude ↓ at base',                     description: 'Attachment areas are more clearly formed.' },
+      { id: 'mech_corners',       label: 'More precise corner geometry',     affects: 'baseShape → box  noiseAmplitude ↓  subdivisions ↑',            description: 'Corners and intersections are sharper and more exact.' },
+      { id: 'mech_bore',          label: 'Smoother bore / channel',          affects: 'noiseAmplitude ↓  subdivisions ↑',                             description: 'Internal channels have smoother interior surfaces.' },
+      { id: 'mech_thread',        label: 'Crisper thread profile',           affects: 'ridges ↑  twist ↑  noiseAmplitude ↓',                         description: 'Helical threading geometry is more sharply defined.' },
+      { id: 'mech_flange',        label: 'Better defined flange',            affects: 'taper at Y range  subdivisions ↑',                             description: 'Outward-projecting rim is more clearly formed.' },
+      { id: 'mech_bracket',       label: 'Cleaner bracket geometry',         affects: 'baseShape → box  noiseAmplitude ↓  scaleY ↓',                  description: 'L-shaped mounting bracket features are more precisely angular.' },
+    ],
+  },
+  {
+    id: 'organic',
+    label: 'Organic / Natural',
+    objectTypes: ['organic'],
+    tags: [
+      { id: 'org_branching',    label: 'More natural branching',        affects: 'baseShape → organic  noiseAmplitude ↑  noiseOctaves ↑', description: 'Object develops split or diverging forms like branches or coral.' },
+      { id: 'org_curves',       label: 'More flowing curves',           affects: 'baseShape → organic  noiseScale ↓  subdivisions ↑',    description: 'Transitions follow smooth continuous curves.' },
+      { id: 'org_shell_spiral', label: 'Better shell spiral',           affects: 'twist ↑  taper ↓  ridges moderate',                    description: 'The helical spiral characteristic of shells becomes more pronounced.' },
+      { id: 'org_bone',         label: 'More natural bone structure',   affects: 'taper oscillating  noiseAmplitude moderate  scaleY ↑', description: 'Dense-at-ends, narrow-in-middle profile of bone.' },
+      { id: 'org_wood_grain',   label: 'More realistic wood grain',     affects: 'noiseScale directional  noiseOctaves ↑',              description: 'Parallel flowing lines characteristic of wood grain.' },
+      { id: 'org_coral',        label: 'Better coral branch spread',    affects: 'baseShape → organic  scaleX ↑  scaleZ ↑  noiseAmplitude ↑', description: 'Branching forms spread outward naturally.' },
+      { id: 'org_growth',       label: 'More natural growth pattern',   affects: 'baseShape → organic  noiseAmplitude ↑  twist slight',  description: 'Overall form suggests something grown not manufactured.' },
+      { id: 'org_transitions',  label: 'Softer organic transitions',    affects: 'noiseScale ↓  subdivisions ↑  noiseAmplitude moderate', description: 'Different parts blend into each other naturally.' },
+      { id: 'org_irregular',    label: 'More irregular natural surface', affects: 'noiseOctaves ↑  noiseScale varied  seed change',     description: 'No two areas look exactly the same.' },
+      { id: 'org_rings',        label: 'Better defined growth rings',   affects: 'ridges ↑  noiseAmplitude ↓',                          description: 'Concentric ring patterns become more visible.' },
+      { id: 'org_lifelike',     label: 'More lifelike overall form',    affects: 'baseShape → organic  noiseOctaves ↑  subdivisions ↑', description: 'Reads more convincingly as a real natural object.' },
+      { id: 'org_asymmetry',    label: 'Better asymmetric variation',   affects: 'noiseAmplitude ↑  scaleX ≠ scaleZ  seed adjustment', description: 'Natural imperfection between the two sides.' },
+    ],
+  },
+  {
+    id: 'decorative',
+    label: 'Decorative / Artistic',
+    objectTypes: ['decorative'],
+    tags: [
+      { id: 'dec_ornate',       label: 'More ornate surface detail',  affects: 'noiseOctaves ↑  noiseAmplitude ↑  ridges ↑',        description: 'Rich, complex surface patterning with multiple texture layers.' },
+      { id: 'dec_clean_lines',  label: 'Cleaner decorative lines',    affects: 'noiseAmplitude ↓ between features  subdivisions ↑', description: 'Decorative features are more precisely defined.' },
+      { id: 'dec_relief',       label: 'Better defined relief',       affects: 'noiseAmplitude ↑  noiseScale tuned  ridges adjusted', description: 'Raised or recessed patterns become more clearly 3D.' },
+      { id: 'dec_balanced',     label: 'More balanced composition',   affects: 'scales balanced  taper → 1  ridges even',           description: 'Visual weight of object is more evenly distributed.' },
+      { id: 'dec_elegant',      label: 'More elegant proportions',    affects: 'scaleY ↑ slightly  taper subtle  noiseAmplitude low', description: 'Dimensions achieve a more refined, aesthetically pleasing ratio.' },
+      { id: 'dec_bold',         label: 'Bolder visual presence',      affects: 'scaleX ↑  scaleZ ↑  ridges ↑  noiseAmplitude ↑',   description: 'More visual impact — stronger silhouette, more pronounced features.' },
+      { id: 'dec_delicate',     label: 'More delicate detailing',     affects: 'noiseScale ↑  noiseAmplitude ↓  subdivisions ↑',   description: 'Fine details are smaller and more intricate.' },
+      { id: 'dec_silhouette',   label: 'More refined silhouette',     affects: 'noiseAmplitude ↓  taper smooth  baseShape refined', description: 'The outline viewed from the front/side is cleaner.' },
+      { id: 'dec_focal',        label: 'Stronger focal point',        affects: 'taper pronounced  ridges concentrated  scaleY adjusted', description: 'One part of the object draws the eye more clearly.' },
+      { id: 'dec_symmetry',     label: 'Better symmetry in pattern',  affects: 'noiseOctaves matched to ridges  subdivisions ↑',   description: 'Repeating decorative elements align more precisely.' },
+      { id: 'dec_dynamic',      label: 'More dynamic form',           affects: 'twist ↑  taper pronounced  noiseAmplitude moderate', description: 'Object feels like it has energy or movement.' },
+    ],
+  },
+  {
+    id: 'resolution',
+    label: 'Resolution and Geometry',
+    objectTypes: ['all'],
+    tags: [
+      { id: 'res_higher',    label: 'Higher mesh resolution',          affects: 'subdivisions ↑',                        description: 'More triangles across the entire surface — captures finer detail.' },
+      { id: 'res_lower',     label: 'Lower mesh resolution',           affects: 'subdivisions ↓',                        description: 'Fewer triangles — faster, smaller file, fine for simple shapes.' },
+      { id: 'res_curves',    label: 'More detail in curved regions',   affects: 'subdivisions ↑  noiseScale adjusted',   description: 'Curved areas get higher polygon density for smoother curvature.' },
+      { id: 'res_topology',  label: 'Cleaner topology flow',           affects: 'subdivisions ↑  baseShape matched',     description: 'Triangle distribution follows contours more logically.' },
+      { id: 'res_reduce',    label: 'Reduce polygon density',          affects: 'subdivisions ↓',                        description: 'Decreases triangles in simple regions.' },
+      { id: 'res_smooth',    label: 'Smoother curvature transitions',  affects: 'subdivisions ↑  noiseAmplitude ↓',      description: 'Areas where surface changes direction feel more gradual.' },
+      { id: 'res_features',  label: 'Sharper feature lines',           affects: 'subdivisions ↑  noiseAmplitude ↓',      description: 'Intentional edges are more precisely defined.' },
+      { id: 'res_even_dist', label: 'Better even triangle distribution', affects: 'subdivisions adjusted  baseShape matched', description: 'Triangles are more uniformly sized across the whole surface.' },
+    ],
+  },
+  {
+    id: 'printability',
+    label: 'Print Readiness',
+    objectTypes: ['all'],
+    tags: [
+      { id: 'print_flat_base',  label: 'Needs flatter base for bed adhesion', affects: 'taper ↓ at base  noiseAmplitude ↓ at base', description: 'Bottom needs a more level, stable surface for the print bed.' },
+      { id: 'print_overhangs',  label: 'Reduce overhangs',                    affects: 'taper adjusted  scaleX/Z ↓ in upper regions', description: 'Overhanging geometry needs reducing to be self-supporting.' },
+      { id: 'print_self_support', label: 'Better self-supporting angles',     affects: 'taper adjusted  noiseAmplitude ↓ in overhang regions', description: 'All surfaces angled to be printable without supports.' },
+      { id: 'print_walls_thicker', label: 'Thicker walls overall',            affects: 'scaleX ↑  scaleZ ↑ proportionally  noiseAmplitude ↓', description: 'Walls need more material thickness to be structurally sound.' },
+      { id: 'print_walls_thinner', label: 'Thinner walls overall',            affects: 'scaleX ↓  scaleZ ↓ proportionally', description: 'Walls unnecessarily thick — reduce material use.' },
+      { id: 'print_weight_dist', label: 'Better weight distribution',         affects: 'taper ↓  scaleY adjusted', description: 'Mass more evenly distributed or at base for stability.' },
+      { id: 'print_thin_sections', label: 'Reduce fragile thin sections',     affects: 'noiseAmplitude ↓  scaleX/Z ↑ slightly', description: 'Areas that would print too thin are thickened.' },
+      { id: 'print_supports',   label: 'Better defined support contact points', affects: 'noiseAmplitude ↓ on underside', description: 'Areas where supports touch are cleaner for easier removal.' },
+      { id: 'print_overall',    label: 'More printable geometry overall',     affects: 'combination of taper, noiseAmplitude, subdivisions', description: 'Object redesigned toward being achievable on FDM/resin without major issues.' },
+    ],
+  },
+];
+
+export const NEGATIVE_TAG_CATEGORIES = [
+  {
+    id: 'neg_surface',
+    label: 'Surface Issues',
+    tags: [
+      { id: 'neg_blobby',        label: 'Too blobby',          avoidanceWeight: 0.75, affects: 'noiseAmplitude flagged as too high' },
+      { id: 'neg_rough',         label: 'Surface too rough',   avoidanceWeight: 0.75, affects: 'noiseAmplitude + noiseOctaves flagged' },
+      { id: 'neg_smooth',        label: 'Surface too smooth',  avoidanceWeight: 0.5,  affects: 'noiseAmplitude flagged as too low' },
+      { id: 'neg_texture',       label: 'Wrong texture pattern', avoidanceWeight: 0.5, affects: 'noiseScale and noiseOctaves flagged' },
+    ],
+  },
+  {
+    id: 'neg_proportions',
+    label: 'Proportion Issues',
+    tags: [
+      { id: 'neg_proportions',   label: 'Wrong proportions',   avoidanceWeight: 0.75, affects: 'scaleX/Y/Z ratios flagged as incorrect' },
+      { id: 'neg_too_large',     label: 'Too large',           avoidanceWeight: 0.5,  affects: 'overall scale flagged' },
+      { id: 'neg_too_small',     label: 'Too small',           avoidanceWeight: 0.5,  affects: 'overall scale flagged' },
+      { id: 'neg_aspect',        label: 'Aspect ratio wrong',  avoidanceWeight: 0.75, affects: 'scaleX/Y/Z ratio flagged' },
+    ],
+  },
+  {
+    id: 'neg_shape',
+    label: 'Shape Issues',
+    tags: [
+      { id: 'neg_wrong_shape',   label: 'Wrong base shape',    avoidanceWeight: 1.0,  affects: 'current baseShape index flagged as wrong' },
+      { id: 'neg_twist',         label: 'Twist is off',        avoidanceWeight: 0.5,  affects: 'twist value flagged' },
+      { id: 'neg_too_many_ridges', label: 'Too many ridges',   avoidanceWeight: 0.25, affects: 'ridges value flagged' },
+      { id: 'neg_too_few_ridges',  label: 'Too few ridges',    avoidanceWeight: 0.25, affects: 'ridges value flagged' },
+      { id: 'neg_missing_features', label: 'Missing features', avoidanceWeight: 0.75, affects: 'noiseAmplitude and subdivisions flagged' },
+      { id: 'neg_completely_wrong', label: 'Completely wrong', avoidanceWeight: 1.0,  affects: 'all params flagged at maximum avoidance weight' },
+    ],
+  },
+];
+
+export const ALGORITHM_REFERENCE = {
+  routeA: {
+    title: 'Route A — How Image Reconstruction Works',
+    sections: [
+      { heading: 'MobileNet Vision Model', body: 'Your uploaded images are processed by MobileNet — a pre-trained vision model that has learned to recognize shapes, edges, curves, and surface texture from millions of images. It converts each view into a 1280-dimensional feature vector — a numerical fingerprint of the visual geometry in that image.' },
+      { heading: 'Multi-View Fusion', body: 'Features from each view are combined with weighted averaging: Front 40% · Side 35% · Top 15% · Bottom 10%. If top or bottom are not uploaded, their weights are redistributed proportionally between front and side. The result is one unified shape embedding.' },
+      { heading: 'Mapping Layer (Param Network)', body: 'A small neural network maps the 1280-dim feature vector to 11 geometry parameters. This is the layer that improves with training — it learns to better interpret MobileNet\'s visual fingerprints into 3D geometry parameters over time.' },
+      { heading: 'Mesh Generation', body: 'Parameters drive a procedural mesh builder using Perlin noise for surface displacement across a parameterized sphere domain. The geometry engine applies base shape, scale, twist, taper, ridges, and multi-octave noise to produce the final triangle mesh.' },
+    ],
+  },
+  routeB: {
+    title: 'Route B — How Point Cloud Reconstruction Works',
+    sections: [
+      { heading: 'Chunked Loading', body: 'Large clouds are divided into spatial chunks to manage memory. The chunk grid resolution scales with point count: 3×3×3 for under 500K points up to 6×6×6 for 5M+ points. Each chunk overlaps its neighbors by 10% to prevent gaps at boundaries.' },
+      { heading: 'Ball-Pivoting Algorithm', body: 'A virtual sphere rolls across the point cloud surface. Wherever it touches exactly three points simultaneously it forms a triangle. The sphere pivots on each triangle edge to find the next surface point, expanding outward until the entire surface is covered.' },
+      { heading: 'Multi-Zone Radius Map', body: 'Rather than one global pivot radius, the bounding box is divided into sample zones (5×5×5 = 125 zones). Each zone estimates its own optimal pivot radius from local point density. This adapts to areas where the scanner captured more or fewer points.' },
+      { heading: '3-Pass Mesh Repair', body: 'Pass 1: Removes degenerate triangles with zero area and compacts dangling vertices. Pass 2: Corrects inward-facing normals using centroid-based detection and flood-fill consistency. Pass 3: Fills holes — fan triangulation for small holes (≤8 edges), advancing-front for large ones.' },
+    ],
+  },
+  training: {
+    title: 'Training — How the Model Improves',
+    sections: [
+      { heading: 'Strategy 2.5 — Dual-Target Training', body: 'Every rated generation produces two training signals simultaneously. A positive target describes the param region to move toward. A negative target describes the param region to avoid. Both signals are weighted by your rating and refined by tag-based corrections.' },
+      { heading: 'Loss Function', body: 'Total Loss = (Positive Loss × positive_weight) + (Negative Loss × avoidance_weight). The positive term uses mean absolute error to pull predictions toward the good target. The negative term uses a log-distance formulation to actively push predictions away from bad param regions.' },
+      { heading: 'Version System', body: 'Working weights update continuously during training. Versions are snapshots saved manually when you decide the model has improved enough to checkpoint. All versions are kept in the model registry — you can switch between them or roll back at any time.' },
+      { heading: 'Generalization', body: 'The network learns patterns between visual features and good geometry params. Training on a conch shell teaches the mapping between curved/ridged organic shapes and high twist/noiseAmplitude params. This generalizes — a new coral branch will benefit from the conch shell training.' },
+    ],
+  },
+};
+
+export const TROUBLESHOOTING = [
+  {
+    category: 'Generation Issues',
+    items: [
+      { q: 'Generate button is disabled on Route A', a: 'Front and side views are both required. Make sure both slots show a checkmark before generating.' },
+      { q: 'Model looks nothing like my object', a: 'The mapping layer needs more training on similar objects. Rate this result, add it to your training queue, and train. After several sessions with similar objects, accuracy improves.' },
+      { q: 'Model is too blobby / too smooth', a: 'Use the rating flow to tag the specific issues. The training system will steer away from these params for similar inputs in future generations.' },
+      { q: 'MobileNet is still loading', a: 'On first ever launch, MobileNet downloads ~10MB. After that it loads from your local device storage instantly. Make sure you have an internet connection for the first load.' },
+    ],
+  },
+  {
+    category: 'Point Cloud Issues',
+    items: [
+      { q: 'File upload shows 0 points', a: 'Check that your PLY file is ASCII format (not binary PLY). XYZ files should have one point per line: x y z. OBJ vertex lines should start with "v ".' },
+      { q: 'Reconstruction takes very long', a: 'Large clouds (1M+ points) take several minutes. Progress is shown per chunk. You can cancel and use the partial mesh if needed.' },
+      { q: 'Mesh has holes after reconstruction', a: 'The repair report shows how many holes were filled. Remaining unfilled holes appear as boundary edges in wireframe view. These usually occur in occluded regions with no scan data.' },
+      { q: 'Scale seems wrong after import', a: 'If no unit metadata was found in your file, the calibration question appears. Enter the longest real-world dimension of your object. Scale is then locked and applied at STL export.' },
+    ],
+  },
+  {
+    category: 'Training Issues',
+    items: [
+      { q: 'I closed the app mid-session — did I lose my data?', a: 'No. All feedback entries are saved to the local database immediately when you confirm each rating. On next launch a recovery banner offers to resume your session.' },
+      { q: 'Training loss is not improving', a: 'Try rating more diverse object types — the network generalizes better with variety. Also ensure your positive and negative tags are consistent and meaningful across sessions.' },
+      { q: 'I want to go back to an earlier model version', a: 'Open the Train tab → Models panel. Find the version you want and click Use. The switch takes effect immediately.' },
+      { q: 'Auto-training is running when I do not want it to', a: 'Toggle Auto-train off in the Train tab settings. You can still trigger training manually with the Train Now button.' },
+      { q: 'Save New Version is greyed out', a: 'You need at least one rated feedback entry in the database to save a version. Complete the rating flow for at least one generated model first.' },
+    ],
+  },
+];
