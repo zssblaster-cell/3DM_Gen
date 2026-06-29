@@ -161,7 +161,7 @@ export function STLDownloadBtn({ geometry, label, repairReport, disabled }) {
     if (!realSize || isNaN(parseFloat(realSize))) return;
     setExporting(true);
     try {
-      const { computeScaleFactor, exportSTL, makeFilename } = await import('../Modules/STLExporter.js');
+      const { computeScaleFactor, exportSTL, makeFilename } = await import('../../Modules/STLExporter.js');
       const scale = computeScaleFactor(geometry.positions, geometry.indices, parseFloat(realSize), units);
       exportSTL(geometry.positions, geometry.indices, geometry.normals, {
         scaleFactor: scale,
