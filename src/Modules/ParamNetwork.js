@@ -134,10 +134,18 @@ export async function train(batch, options = {}) {
     let epochLoss = 0, count = 0;
 
     for (const entry of validBatch) {
-      // FIX: use optimizer.minimize() — the correct TF.js API for Sequential model training
+      // FIX: minimize() with no varList defaults to ALL registered trainable
+      // variables (which includes this model's weights). Passing
+      // model.trainableWeights directly is wrong — that returns Keras-style
+      // LayerVariable wrappers, not raw tf.Variable, and TF.js's internal
+      // assert (v instanceof Variable) rejects every element. Verified fix
+      // by running the real train() against real @tensorflow/tfjs in Node.
       const lossValue = _opt.minimize(() => tf.tidy(() => {
         const input     = tf.tensor2d([Array.from(entry.features)], [1, entry.features.length]);
-        const pred      = _model.predict(input);
+        // apply(..., {training: true}) — not predict() — so dropout layers
+        // actually activate during the training pass. predict() always runs
+        // inference mode and would silently disable both dropout layers.
+        const pred      = _model.apply(input, { training: true });
         const posTarget = tf.tensor2d([Array.from(entry.positiveTarget)], [1, PARAM_COUNT]);
         const posLoss   = pred.sub(posTarget).abs().mean().mul(entry.positiveWeight || 0.5);
 
@@ -148,7 +156,7 @@ export async function train(batch, options = {}) {
           negLoss = tf.scalar(1).div(dist).mul(entry.distanceFromDesired || 0.5).mul(0.3);
         }
         return posLoss.add(negLoss);
-      }), true, _model.trainableWeights);
+      }), true);
 
       if (lossValue) {
         epochLoss += lossValue.dataSync()[0];

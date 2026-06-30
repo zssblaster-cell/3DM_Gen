@@ -143,7 +143,11 @@ export async function serializeWeights(model) {
       data:  Array.from(await w.data()),
     }))
   );
-  disposeAll(weights);
+  // Do NOT dispose `weights` — these are references to the model's live
+  // variable tensors, not copies. Disposing them here breaks the model:
+  // every predict()/train() call afterward throws "already disposed" until
+  // a fresh loadVersion() overwrites the weights. The model owns these
+  // tensors' lifecycle, not this function. Verified via real execution.
   return serialized;
 }
 
