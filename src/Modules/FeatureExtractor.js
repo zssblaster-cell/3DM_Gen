@@ -9,13 +9,16 @@ import { registerModel, getModelWeights,
 
 const MODEL_KEY     = 'mobilenet-v1';
 const MODEL_TYPE    = 'feature-extractor';
+// MobileNetV2's final 1x1 "head" conv is fixed at 1280 channels regardless of
+// the alpha width multiplier — this is a documented architectural constant,
+// not something that varies with our alpha:0.5 config below.
+const EXPECTED_EMBED_DIM = 1280;
 // View contribution weights
 const VIEW_WEIGHTS = [0.40, 0.35, 0.15, 0.10]; // front, side, top, bottom
 
-let _model     = null;
-let _tf        = null;
-let _ready     = false;
-let _loading   = false;
+let _model      = null;
+let _ready      = false;
+let _loading    = false;
 let _onReadyCbs = []; // array so concurrent callers all get resolved
 
 export function isReady() { return _ready; }
@@ -26,36 +29,60 @@ export function whenReady() {
   return new Promise((resolve) => { _onReadyCbs.push(resolve); });
 }
 
-// Load MobileNet — checks IndexedDB first, falls back to CDN
+// Load MobileNet — checks IndexedDB first, falls back to CDN.
+//
+// IMPORTANT: we always construct the model through the @tensorflow-models/
+// mobilenet package's own load() function, never via a bare tf.loadGraphModel
+// call. Reading that package's source directly confirmed load() always
+// returns the same MobileNetImpl wrapper class regardless of where the
+// underlying GraphModel weights come from — passing modelUrl: 'indexeddb://…'
+// re-wraps our cached weights through the SAME class that a fresh CDN
+// download would produce. The wrapper is what exposes .infer(), which is
+// what knows how to reach the 1280-dim embedding node inside the graph
+// (rather than the model's default 1001-way classification output).
+// A prior version of this function called tf.loadGraphModel() directly on
+// the cached entry, which produces a bare GraphModel with no .infer() at
+// all — feature extraction would then silently fall back to raw
+// classification logits, corrupting every embedding after the first
+// (uncached) session.
 export async function loadModel(onProgress = null) {
   if (_ready) return;
   if (_loading) return whenReady();
   _loading = true;
 
   try {
-    _tf = await import('@tensorflow/tfjs');
+    // Side-effect import: registers a default backend (cpu/webgl) before
+    // the mobilenet package's internal tf calls run.
+    await import('@tensorflow/tfjs');
+    const mobilenetPkg = await import('@tensorflow-models/mobilenet');
 
-    // Try loading from IndexedDB first
     const saved = await getModelWeights(MODEL_KEY);
+
     if (saved) {
       onProgress?.({ stage: 'cache', message: 'Loading from local storage…', pct: 20 });
       try {
-        _model = await _tf.loadGraphModel(`indexeddb://${MODEL_KEY}`);
+        _model = await mobilenetPkg.load({
+          version: 2, alpha: 0.5,
+          modelUrl: `indexeddb://${MODEL_KEY}`,
+        });
+        if (typeof _model.infer !== 'function') {
+          throw new Error('Cached model did not produce a usable wrapper');
+        }
         _ready = true;
         _loading = false;
         _onReadyCbs.forEach(r => r()); _onReadyCbs = [];
         return;
-      } catch (_) {
-        // Cache miss or corrupt — fall through to CDN
+      } catch (cacheErr) {
+        console.warn('FeatureExtractor: cached model failed to load, re-downloading —', cacheErr.message);
+        // Fall through to fresh download below
       }
     }
 
-    // Download from CDN
+    // Download from CDN (also runs if the cache load above failed)
     onProgress?.({ stage: 'download', message: 'Downloading vision model (~10MB, once only)…', pct: 10 });
-    const mobilenet = await import('@tensorflow-models/mobilenet');
     onProgress?.({ stage: 'download', message: 'Loading model weights…', pct: 40 });
 
-    _model = await mobilenet.load({ version: 2, alpha: 0.5 });
+    _model = await mobilenetPkg.load({ version: 2, alpha: 0.5 });
     onProgress?.({ stage: 'cache', message: 'Saving to local storage…', pct: 80 });
 
     // Save to IndexedDB for future use
@@ -90,29 +117,28 @@ export async function loadModel(onProgress = null) {
 
 // Extract a 1280-dim feature vector from a single canvas
 export async function extractFeatures(canvas) {
-  if (!_ready || !_model || !_tf) throw new Error('Model not loaded');
+  if (!_ready || !_model) throw new Error('Model not loaded');
 
   const resized = resizeCanvas(canvas, 224, 224);
-  let tensor, embedding;
 
+  // Pass the canvas directly to infer() and let it handle ALL preprocessing
+  // (resize, cast, normalize) using the correct constants for this exact
+  // model variant. A prior version manually normalized to [-1,1] before
+  // calling infer(), which ALSO normalizes internally — every embedding was
+  // silently computed from double-normalized, near-zero garbage values.
+  let embedding;
   try {
-    tensor = _tf.browser.fromPixels(resized);
-    // MobileNet expects [1, 224, 224, 3] float32 in [-1, 1]
-    // Use tidy to clean intermediate tensors (expandDims, toFloat, div)
-    const batched = _tf.tidy(() => tensor.expandDims(0).toFloat().div(127.5).sub(1));
-
-    if (_model.infer) {
-      // @tensorflow-models/mobilenet API
-      embedding = _model.infer(batched, true);
-    } else {
-      // TF.js SavedModel API
-      embedding = _model.predict(batched);
-    }
-
+    embedding = _model.infer(resized, true); // true = 1280-dim embedding, not classification logits
     const data = await embedding.data();
+
+    if (data.length !== EXPECTED_EMBED_DIM) {
+      throw new Error(
+        `MobileNet returned a ${data.length}-dim embedding, expected ${EXPECTED_EMBED_DIM}. ` +
+        `The cached model may be corrupted — clearing site data and reloading should fix this.`
+      );
+    }
     return new Float32Array(data);
   } finally {
-    tensor?.dispose();
     embedding?.dispose();
   }
 }
